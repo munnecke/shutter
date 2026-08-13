@@ -12,6 +12,68 @@ true exposure time.
                                      └──► /save ──► LittleFS /library
 ```
 
+**There are two front ends in this repo.** `docs/index.html` is a self-contained
+browser version that uses your computer's own microphone and needs no hardware at
+all — start there. The ESP32 firmware below is the standalone bench.
+
+---
+
+## Browser version — no hardware
+
+Open `docs/index.html`. That's it: one file, no build step, no CDN, no server.
+`getUserMedia` works from the `file://` scheme in Chrome and Firefox, so
+double-clicking the file is enough. Safari is stricter and may need a real
+origin — serve the directory over `localhost`, or turn on GitHub Pages
+(Settings → Pages → main branch, `/docs` folder) and use the HTTPS URL.
+
+Nothing is uploaded. Audio never leaves the page, and saved traces live in the
+browser's IndexedDB.
+
+Why it beats the ESP32 on signal quality: your sound card samples at 48 kHz in
+floating point against the board's 5 kHz at 12 bits. That's 20.8 µs of timing
+resolution instead of 200 µs — about 48 samples across a 1/1000 exposure rather
+than five. Browser audio latency is famously bad and completely irrelevant here,
+because Δt is measured *within* one continuous stream, so absolute latency
+cancels out.
+
+What it does:
+
+- **Threshold auto-trigger with pre-roll.** Arm it, fire the shutter, and the
+  page keeps the audio from *before* the trigger. This is the pre-trigger the
+  firmware design can't do.
+- **Automatic onset detection.** The two curtain events are found and marked for
+  you. It works by tracking the rise in high-frequency energy rather than raw
+  amplitude, so the closing click is still visible sitting on the opening
+  click's ring-down.
+- Δt readout, nearest fractional speed, deviation in stops, spectrum over
+  whatever span you've zoomed to, library, and WAV export.
+
+Accuracy against synthetic traces, measured in stops of error:
+
+| Nominal | 1/30 | 1/60 | 1/125 | 1/250 | 1/500 |
+| --- | --- | --- | --- | --- | --- |
+| Auto-placement error | 0.000 | 0.003 | 0.019 | 0.059 | buried |
+
+"Buried" is not a bug. Below roughly 3 ms the closing click arrives inside the
+opening click's ring-down, and no amount of signal processing recovers what the
+microphone never separated. The page detects this case, says so, and leaves you
+to zoom in and place the markers by eye. This is the ceiling of acoustic timing,
+not of the implementation.
+
+### Getting a usable signal
+
+- **Turn off the browser's audio processing.** The page requests
+  `noiseSuppression`, `autoGainControl`, and `echoCancellation` off, then reports
+  in the header whether the browser actually complied. If that chip reads
+  anything other than `raw`, the transients are being blunted — noise suppression
+  in particular is designed to remove exactly the impulsive clicks you're
+  measuring. Desktop Chrome and Firefox honour the request; iOS Safari applies
+  system processing you can't fully disable.
+- **Don't clip.** The page warns when a capture clips. A clipped edge destroys
+  onset timing. Back the mic off rather than turning gain down.
+- **Any external mic beats a laptop's built-in.** Position matters more than
+  quality: a few centimetres from the shutter, off any surface that rattles.
+
 ---
 
 ## Hardware
@@ -177,6 +239,7 @@ bytes of each file to build the library listing.
 ## Layout
 
 ```
+docs/index.html         browser version — self-contained, no hardware
 platformio.ini          build config, pinned to Arduino core 3.x
 src/main.cpp            firmware: DMA ADC, async server, LittleFS
 src/secrets.example.h   copy to src/secrets.h and fill in — the real one is gitignored

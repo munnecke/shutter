@@ -1,7 +1,12 @@
 # Shutter Bench — notes for Claude Code
 
-Acoustic camera-shutter timer. XIAO ESP32S3 firmware in `src/`, a vanilla-JS web
-app in `data/` that gets uploaded to LittleFS, and Node dev tooling in `tools/`.
+Acoustic camera-shutter timer. Two front ends:
+
+- `docs/index.html` — self-contained browser version using the computer's own
+  microphone via `getUserMedia`. One file: no build step, no dependencies, no
+  server. This is the primary tool.
+- `src/` + `data/` — XIAO ESP32S3 firmware and the web app uploaded to LittleFS.
+  Node dev tooling in `tools/`.
 
 ## Commands
 
@@ -37,6 +42,28 @@ waveform.
   a flag.
 - **`src/secrets.h` is gitignored.** Never commit real credentials; edit
   `src/secrets.example.h` if the template itself needs to change.
+
+## Browser version (`docs/index.html`)
+
+Single file, single IIFE, zero dependencies — keep it that way. Canvas plotting
+is hand-rolled: the time domain renders a min/max envelope per pixel column,
+which is how you draw 100k audio samples without decimating.
+
+- **Onset detection is tuned, not arbitrary.** `ENV_MS` 0.6 / `LAG_MS` 0.8 /
+  `REFRACT_MS` 0.8 came out of a grid search against synthetic traces. It runs on
+  the first difference of the signal, because a click has a steep edge and a
+  ring-down does not — plain amplitude thresholding finds the first event and
+  then drowns in its own tail. If you touch these constants, re-measure across
+  1/30 to 1/500 before committing.
+- **Below ~3 ms the second click is genuinely buried** in the first ring-down.
+  The code warns and falls back to manual markers. Do not "fix" this with a more
+  aggressive threshold; the information is not in the recording.
+- **Always request `noiseSuppression`, `autoGainControl`, `echoCancellation`
+  off**, and surface what the browser actually applied — noise suppression
+  removes the transients being measured.
+- AudioWorklet with a ScriptProcessor fallback; both connect through a zero-gain
+  node so the mic is never fed back to the speakers.
+- Storage is IndexedDB, not localStorage — a single trace is hundreds of kB.
 
 ## Frontend shape
 
