@@ -1,0 +1,20 @@
+# Never commit real credentials. Copy src/secrets.example.h to src/secrets.h.
+src/secrets.h
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Vendored libraries — regenerate with `node tools/fetch-libs.js`
+data/lib/*.js
+data/lib/*.css
+
+# Mock bench scratch data
+tools/.dev-library/

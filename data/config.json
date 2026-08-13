@@ -1,0 +1,10 @@
+{
+  "useCdn": true,
+  "sampleRate": 5000,
+  "windowMs": 2000,
+  "minWindowMs": 250,
+  "maxWindowMs": 6000,
+  "traceColor": "#123f73",
+  "fftColor": "#9a7014",
+  "autoscaleY": false
+}

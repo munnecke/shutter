@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Shutter Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">Shutter Bench</span>
+    <span class="brand-sub">acoustic escapement timer</span>
+  </div>
+  <div class="bar-right">
+    <span class="lamp" id="lamp" data-state="offline"></span>
+    <span class="lamp-label" id="lampLabel">connecting</span>
+    <button class="btn btn-ghost" id="openSettings">Settings</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ---------------------------------------------------------- the readout -->
+  <section class="readout" aria-live="polite">
+    <div class="readout-main">
+      <div class="eyebrow">Elapsed between markers</div>
+      <div class="delta"><span id="deltaValue">—</span><span class="unit">ms</span></div>
+      <div class="delta-sub">
+        <span id="deltaFraction">place two markers on the trace</span>
+      </div>
+    </div>
+
+    <div class="readout-meter">
+      <div class="eyebrow">Deviation from nominal</div>
+      <div class="meter" id="meter">
+        <div class="meter-scale">
+          <span class="tick" style="left:0%"></span>
+          <span class="tick" style="left:25%"></span>
+          <span class="tick tick-zero" style="left:50%"></span>
+          <span class="tick" style="left:75%"></span>
+          <span class="tick" style="left:100%"></span>
+        </div>
+        <div class="needle" id="needle" hidden></div>
+        <div class="meter-legend"><span>−1 stop</span><span>0</span><span>+1 stop</span></div>
+      </div>
+      <div class="meter-verdict" id="verdict">enter a nominal speed to compare</div>
+    </div>
+
+    <dl class="readout-facts">
+      <div><dt>Marker A</dt><dd id="markA">—</dd></div>
+      <div><dt>Marker B</dt><dd id="markB">—</dd></div>
+      <div><dt>Peak</dt><dd id="peakVal">—</dd></div>
+      <div><dt>Noise floor</dt><dd id="noiseVal">—</dd></div>
+    </dl>
+  </section>
+
+  <!-- ------------------------------------------------------- time domain -->
+  <section class="panel panel-wide">
+    <div class="panel-head">
+      <h2>Time domain</h2>
+      <div class="panel-tools">
+        <button class="btn btn-small" id="clearMarkers">Clear markers</button>
+        <button class="btn btn-small" id="resetZoom">Reset zoom</button>
+      </div>
+    </div>
+    <div class="plot" id="plotTime"></div>
+    <p class="hint">Drag across the trace to zoom. Shift-drag to pan, scroll to zoom, double-click to reset. Click once to drop marker A, again for marker B.</p>
+  </section>
+
+  <div class="lower">
+    <!-- ---------------------------------------------------- frequency -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Spectrum</h2>
+        <div class="panel-tools">
+          <label class="field field-inline">
+            <span>Window</span>
+            <select id="fftWindow">
+              <option value="hann" selected>Hann</option>
+              <option value="hamming">Hamming</option>
+              <option value="none">Rectangular</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="fftLog" checked><span>dB</span></label>
+        </div>
+      </div>
+      <div class="plot plot-short" id="plotFreq"></div>
+      <p class="hint">Computed on the visible span of the time-domain plot. Nyquist limit 2.5&nbsp;kHz.</p>
+    </section>
+
+    <!-- -------------------------------------------------------- side rail -->
+    <aside class="rail">
+
+      <section class="card">
+        <h3>Capture</h3>
+        <label class="field">
+          <span>Window length</span>
+          <div class="field-row">
+            <input type="range" id="windowRange" min="250" max="6000" step="250" value="2000">
+            <output id="windowOut" class="mono">2000 ms</output>
+          </div>
+        </label>
+        <button class="btn btn-primary" id="captureBtn">Capture now</button>
+        <p class="hint">Or press the bench button, then fire the shutter.</p>
+      </section>
+
+      <section class="card">
+        <h3>Save this trace</h3>
+        <label class="field">
+          <span>Nominal speed</span>
+          <input type="text" id="speedInput" placeholder="1/125" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Notes</span>
+          <input type="text" id="notesInput" placeholder="Nikon F, post-CLA" autocomplete="off">
+        </label>
+        <button class="btn" id="saveBtn" disabled>Save to bench</button>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h3>Library</h3>
+          <button class="btn btn-ghost btn-small" id="refreshLib">Refresh</button>
+        </div>
+        <ul class="lib" id="libList"><li class="lib-empty">Nothing saved yet.</li></ul>
+      </section>
+
+    </aside>
+  </div>
+</main>
+
+<!-- ------------------------------------------------------------- settings -->
+<dialog id="settings" class="sheet">
+  <form method="dialog">
+    <h2>Settings</h2>
+
+    <label class="check check-block">
+      <input type="checkbox" id="cfgCdn">
+      <span>
+        <strong>Load charting libraries from the internet</strong>
+        <small>Off serves uPlot and the FFT library from the board's own flash, so the bench works with no internet. Takes effect on reload.</small>
+      </span>
+    </label>
+
+    <label class="check check-block">
+      <input type="checkbox" id="cfgAutoscale">
+      <span>
+        <strong>Autoscale amplitude axis</strong>
+        <small>Off pins the Y axis to the full 0–4095 ADC range.</small>
+      </span>
+    </label>
+
+    <div class="field-grid">
+      <label class="field"><span>Waveform colour</span><input type="color" id="cfgTrace"></label>
+      <label class="field"><span>Spectrum colour</span><input type="color" id="cfgFft"></label>
+    </div>
+
+    <p class="sheet-note" id="cfgStatus"></p>
+
+    <menu>
+      <button class="btn btn-ghost" value="cancel">Cancel</button>
+      <button class="btn btn-primary" id="cfgSave" value="save">Save settings</button>
+    </menu>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
